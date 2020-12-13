@@ -35,6 +35,7 @@ SOURCES += \
         dog_widget.cpp \
         main.cpp \
         mainwindow.cpp \
+        qcustomplot.cpp \
         system_resource_usage.cpp
 
 HEADERS += \
@@ -43,6 +44,7 @@ HEADERS += \
         dog_widget.h \
         globle_define.h \
         mainwindow.h \
+        qcustomplot.h \
         system_resource_usage.h
 
 FORMS += \

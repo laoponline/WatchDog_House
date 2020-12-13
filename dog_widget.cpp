@@ -34,7 +34,7 @@ Dog_Widget::Dog_Widget(QWidget *parent, QString config_name) :
     else ui->checkBox_show_heartbeat->setCheckState(Qt::Unchecked);
 
 
-    ui->label_image->setPixmap(QPixmap::fromImage(QImage(":/image/Dog_Sleep.png")).scaled(ui->label_image->size()));  //显示图片
+   // ui->label_image->setPixmap(QPixmap::fromImage(QImage(":/image/Dog_Sleep.png")).scaled(ui->label_image->size()));  //显示图片
 
 
     ui->progressBar_PID->setMaximum(100);  //进度条的最大最小值
@@ -133,6 +133,106 @@ void Dog_Widget::stop()
 
 
 
+void Dog_Widget::Plot_Setup(QCustomPlot *customPlot)
+{
+    qDebug("sensor Setup Plot: start...");
+
+//    QSettings ini_setting(INT_PATH,QSettings::IniFormat);   //设置文件读取
+//    if (ini_setting.value("Plot/AutoScale","false").toString() == "true")    //图标高度自动调整
+//    Plot_AutoScale = true;
+//    else Plot_AutoScale = false;
+
+    //移除默认坐标轴
+   // customPlot->xAxis->setVisible(false);
+    customPlot->yAxis->setVisible(false);
+
+    //添加坐标轴
+   // xAxis = customPlot->axisRect()->addAxis(QCPAxis::atBottom);
+    yAxis1 = customPlot->axisRect()->addAxis(QCPAxis::atLeft);
+    yAxis2 = customPlot->axisRect()->addAxis(QCPAxis::atLeft);
+
+
+    yAxis1->setVisible(false);
+    yAxis2->setVisible(false);
+    //更改横轴为时间轴
+
+    customPlot->xAxis->setLabel(""); //设置X轴的标签为空白
+    //customPlot->xAxis->setTickLabelSide(QCPAxis::lsInside);    //数字显示在内侧
+    QSharedPointer<QCPAxisTickerTime> timeTicker(new QCPAxisTickerTime);  //设计一个指向新的QCPAxisTickerTime的指针
+    timeTicker->setTimeFormat("%d-%h:%m:%s");                       //时间显示的格式
+    timeTicker->setTickCount(10);
+    customPlot->xAxis->setTickLabelRotation(30);                                           //调整显示角度
+    customPlot->xAxis->setTicker(timeTicker);
+
+
+
+    //添加图形
+     QPalette pa;
+
+    customPlot->addGraph(customPlot->xAxis,yAxis1);
+    customPlot->graph(0)->setPen(QPen(QColor(255, 0, 0))); // 红色显示CPU占用
+    customPlot->graph(0)->setAdaptiveSampling(true);
+    customPlot->graph(0)->setName("Cpu");
+    yAxis1->setRange(-20,100);
+
+
+
+    customPlot->addGraph(customPlot->xAxis,yAxis2);
+    customPlot->graph(1)->setPen(QPen(QColor(0, 255, 0))); // 绿色显示RAM占用
+    customPlot->graph(1)->setAdaptiveSampling(true);
+    customPlot->graph(1)->setName("Ram");
+    yAxis2->setRange(300,1100);
+
+    customPlot->setBackground(QColor(255,255,255));             //设置背景颜色
+
+    customPlot->replot(QCustomPlot::rpQueuedReplot);
+
+    tracer = new QCPItemTracer(customPlot);
+    tracer->setGraph(customPlot->graph(5)); //游标设置为电压，保证每个数据都会有
+    tracer->setStyle(QCPItemTracer::tsCrosshair);  //游标形状
+    tracer->setPen(QPen(Qt::red));
+    tracer->setBrush(Qt::red);
+    tracer->setSize(10);
+
+    label = new QCPItemText(customPlot);
+    label->setLayer("overlay");
+    label->setLayer(customPlot->graph(0)->layer());
+    label->setClipToAxisRect(false);
+    label->setPadding(QMargins(5, 5, 5, 5));
+    label->setBrush(QBrush(QColor(244, 244, 244, 100)));
+    label->setPen(QPen(Qt::blue));
+    label->position->setParentAnchor(tracer->position);
+    label->setFont(QFont("宋体", 8));
+
+    arrow = new QCPItemLine(customPlot);
+    arrow->setLayer("overlay");
+    arrow->setClipToAxisRect(false);
+    arrow->setHead(QCPLineEnding::esSpikeArrow);
+
+
+    tracer->position->setTypeX(QCPItemPosition::ptPlotCoords);
+    tracer->position->setTypeY(QCPItemPosition::ptPlotCoords);
+
+    label->setPositionAlignment(Qt::AlignLeft|Qt::AlignVCenter);
+
+    arrow->end->setParentAnchor(tracer->position);
+    arrow->start->setParentAnchor(label->position);
+
+
+
+    tracer->setVisible(true);
+    label->setVisible(true);
+    arrow->setVisible(true);
+
+
+    connect(customPlot, SIGNAL(mouseMove(QMouseEvent*)), this,SLOT(SLOT_Show_Tracer(QMouseEvent*)));
+    connect(customPlot, SIGNAL(mousePress(QMouseEvent*)), this,SLOT(SLOT_Show_Tracer(QMouseEvent*)));
+
+     qDebug("sensor Setup Plot: end...");
+}
+
+
+
 void Dog_Widget::Log_Setup()       //设置系统log
 {
     qDebug("Setup Log: start...");
@@ -140,33 +240,38 @@ void Dog_Widget::Log_Setup()       //设置系统log
     QSettings ini_setting(INT_PATH,QSettings::IniFormat);   //设置文件读取
     ini_setting.beginGroup("Dogs");
     ini_setting.beginGroup(my_name);
-    QString log_path = ini_setting.value("Log_Path",LOG_PATH_DEFAULT).toString();
-    if (log_path == LOG_PATH_DEFAULT)
-     ini_setting.setValue("Log_Path",LOG_PATH_DEFAULT);
 
-    log_addr = log_path + QDate::currentDate().toString("yyyy-M");
-    qDebug()<<"Setup Log: log file addr = "<<log_addr;
-    QDir log_dir;
-
-    if (!log_dir.exists(log_addr))          //不存在目录则创建目录
-       {
-            log_dir.mkpath(log_addr);
-            qDebug()<<"Setup Log: mkpath ";
-       }
-    else qDebug()<<"Setup Log: path exists ";
-
-    if (log_file.isOpen())
+    if (ini_setting.value("Log_To_File_Enabled","false").toString() == "true")   //如果确认要进行LOG文件记录
     {
-        log_file.flush();
-        log_file.close();
+        QString log_path = ini_setting.value("Log_Path",LOG_PATH_DEFAULT).toString();
+        if (log_path == LOG_PATH_DEFAULT)
+         ini_setting.setValue("Log_Path",LOG_PATH_DEFAULT);
+
+        log_addr = log_path + my_name + QDate::currentDate().toString("yyyy-M");   //LOG的路径组成为 log/名称/月份
+        qDebug()<<"Setup Log: log file addr = "<<log_addr;
+        QDir log_dir;
+
+        if (!log_dir.exists(log_addr))          //不存在目录则创建目录
+           {
+                log_dir.mkpath(log_addr);
+                qDebug()<<"Setup Log: mkpath ";
+           }
+        else qDebug()<<"Setup Log: path exists ";
+
+        if (log_file.isOpen())
+        {
+            log_file.flush();
+            log_file.close();
+        }
+        log_file.setFileName(log_addr + QDate::currentDate().toString("/yyyy-MM-dd-")+"log.txt");
+        bool open_success = log_file.open(QIODevice::ReadWrite | QIODevice::Append | QIODevice::Text);   //跳到最后，并且使用Text,这样endl会自动换行
+        qDebug()<<"Setup Log: file open = "<<open_success;
+        if (open_success)
+        {
+            log_write.setDevice(&log_file);
+        } else log_file.close();
     }
-    log_file.setFileName(log_addr + QDate::currentDate().toString("/yyyy-MM-dd-")+"log.txt");
-    bool open_success = log_file.open(QIODevice::ReadWrite | QIODevice::Append | QIODevice::Text);   //跳到最后，并且使用Text,这样endl会自动换行
-    qDebug()<<"Setup Log: file open = "<<open_success;
-    if (open_success)
-    {
-        log_write.setDevice(&log_file);
-    } else log_file.close();
+
     ini_setting.endGroup();
     ini_setting.endGroup();
     qDebug("Setup Log: end...");
@@ -590,7 +695,7 @@ void Dog_Widget::on_pushButton_Start_clicked()
         ui->lineEdit_target_name->setEnabled(false);       //开始监控后自动关掉这两个可修改的部分
         ui->lineEdit_target_position->setEnabled(false);
 
-        ui->label_image->setPixmap(QPixmap::fromImage(QImage(":/image/Dog_awake.jpg")).scaled(ui->label_image->size()));
+        //ui->label_image->setPixmap(QPixmap::fromImage(QImage(":/image/Dog_awake.jpg")).scaled(ui->label_image->size()));
         QIcon icon = QIcon("./image/Dog_awake.jpg");      //设置图标等内容
 
         ui->pushButton_Start->setText(QString::fromLocal8Bit("停止监控"));
@@ -627,7 +732,7 @@ void Dog_Widget::on_pushButton_Start_clicked()
             Log_Add(tr("停止Socket监控"));
         }
 
-        ui->label_image->setPixmap(QPixmap::fromImage(QImage("/image/Dog_Sleep.png")).scaled(ui->label_image->size()));
+        //ui->label_image->setPixmap(QPixmap::fromImage(QImage("/image/Dog_Sleep.png")).scaled(ui->label_image->size()));
         QIcon icon = QIcon("/image/Dog_Sleep.jpg");      //设置图标等内容
         ui->pushButton_Start->setText(QString::fromLocal8Bit("开始监控"));
         state = STATE_IDLE;
@@ -658,7 +763,7 @@ void Dog_Widget::on_pushButton_System_Config_clicked()
 {
     Log_Add(QString::fromLocal8Bit("进行系统设置"));
     QString new_name;
-    Dialog_Dog_Config *system_config_dlg = new Dialog_Dog_Config(this,name(),&new_name);
+    Dialog_Dog_Config *system_config_dlg = new Dialog_Dog_Config(this,my_name,&new_name);
     int ret = system_config_dlg->exec();       //展示设置界面，模态
     qDebug()<<"Config dialog ret = "<<ret;
     switch (ret)

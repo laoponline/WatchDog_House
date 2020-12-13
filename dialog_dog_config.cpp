@@ -1,4 +1,4 @@
-#include "dialog_dog_config.h"
+﻿#include "dialog_dog_config.h"
 #include "ui_dialog_dog_config.h"
 
 Dialog_Dog_Config::Dialog_Dog_Config(QWidget *parent, QString config_name , QString* for_new_name) :
@@ -29,7 +29,7 @@ Dialog_Dog_Config::Dialog_Dog_Config(QWidget *parent, QString config_name , QStr
         ui->lineEdit_target_position->setText(ini_setting.value("Target_Paht").toString());
         ui->lineEdit_target_arg->setText(ini_setting.value("Target_Arg").toString());
 
-        if (ini_setting.value("Log_Enabled","false").toString() == "true")             //LOG保存地址
+        if (ini_setting.value("Log_To_File_Enabled","false").toString() == "true")             //LOG保存地址
              ui->checkBox_Log_Enabled->setCheckState(Qt::Checked);
         else ui->checkBox_Log_Enabled->setCheckState(Qt::Unchecked);
         ui->lineEdit_Log_Addr->setText(ini_setting.value("Log_Path",LOG_PATH_DEFAULT).toString());
@@ -99,8 +99,8 @@ void Dialog_Dog_Config::save_all()
     ini_setting.setValue("Target_Arg",ui->lineEdit_target_arg->text());  //目标运行参数
 
     if (Qt::Checked == ui->checkBox_Log_Enabled->checkState())     //是否将Log保存到文件
-        ini_setting.setValue("Log_Enabled","true");
-    else ini_setting.setValue("Log_Enabled","false");
+        ini_setting.setValue("Log_To_File_Enabled","true");
+    else ini_setting.setValue("Log_To_File_Enabled","false");
     ini_setting.setValue("Log_Path",ui->lineEdit_Log_Addr->text());  //Log保存位置
 
     if (Qt::Checked == ui->checkBox_PID_Enabled->checkState()) //是否自动开始工作

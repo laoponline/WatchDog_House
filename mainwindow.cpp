@@ -8,6 +8,10 @@
 /// 一旦定时器时间归零，则认为目标程序陷入了无法恢复的错误，且没有对自身进行重启。此时需要调入外部力量进行重启。
 /// 4. 可以记录上次征程退出时主窗体显示的位置，并且在下次启动时重新显示在该位置上
 ///
+/// 版本0.1 20201213
+/// 1. 加入了系统资源监控功能，可以监控CPU 内存 硬盘的使用量
+/// 2. 实装优化了看门狗的Log写入文件功能
+///
 ///
 ///
 ///
@@ -22,6 +26,7 @@ MainWindow::MainWindow(QWidget *parent) :
 {
 
      ui->setupUi(this);
+     //QDir::setCurrent(QCoreApplication::applicationDirPath());   //将默认路径设置到当前的exe目录文件下
 
      QSettings ini_setting(INT_PATH,QSettings::IniFormat);   //设置文件读取
      ini_setting.beginGroup("System");
@@ -90,6 +95,8 @@ void MainWindow::delay_init()
 {
     qDebug()<<"Begin Delay Init...";
     Dog_Init();
+
+
 
     qDebug()<<"End Delay Init...";
 
@@ -189,7 +196,7 @@ int MainWindow::Dog_Add(QString target_name, int index)
     return 0;
 }
 
-int MainWindow::Dog_Config_Return(QString target_name, int ret, QString new_name)
+void MainWindow::Dog_Config_Return(QString target_name, int ret, QString new_name)
 {
     qDebug()<<"Dog house get "<<target_name<<"ret ="<<ret;
     int pos = -1;
