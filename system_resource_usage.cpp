@@ -1,4 +1,6 @@
-﻿#include "system_resource_usage.h"
+﻿#pragma execution_character_set("utf-8")   //告诉mscv 采用utf-8编码
+
+#include "system_resource_usage.h"
 
 System_Resource_Usage::System_Resource_Usage(QWidget *parent)
 {
@@ -105,6 +107,7 @@ void System_Resource_Usage::RAM_Usage_Check()
 void System_Resource_Usage::Disk_Usage_Check()
 {
 
+    //return;   //因为可能产生导致当前工作路径发生改变的问题，所以暂时不做处理
 
     static char path[_MAX_PATH];//存储当前系统存在的盘符
     int curdrive = _getdrive();
@@ -136,6 +139,8 @@ void System_Resource_Usage::Disk_Usage_Check()
         }
     }
     current_Disk_Usage = ((Disk_Total - Disk_Total_Free)*100.0) / Disk_Total;
+    //_chdrive( curdrive );  //返回初始的磁盘，否则可能发生文件保存问题
+    QDir::setCurrent(QCoreApplication::applicationDirPath());   //将默认路径设置到当前的exe目录文件下，否则Ini文件读取会出大问题
     //qDebug("Total disk capacity:%lu MB,Free disk capacity:%lu MB, usage = %02f",Disk_Total,Disk_Total_Free,current_Disk_Usage);
 
 

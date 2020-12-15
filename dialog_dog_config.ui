@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>500</width>
-    <height>300</height>
+    <width>604</width>
+    <height>346</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -88,13 +88,6 @@
       </spacer>
      </item>
      <item>
-      <widget class="QCheckBox" name="checkBox_Ram_Check_Enabled">
-       <property name="text">
-        <string>启用内存消耗监控</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QLabel" name="label_fixed">
        <property name="text">
         <string>进程名称</string>
@@ -126,6 +119,44 @@
       <widget class="QLabel" name="label_fixed_5">
        <property name="text">
         <string>秒</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_5">
+     <item>
+      <widget class="QCheckBox" name="checkBox_Ram_Check_Enabled">
+       <property name="text">
+        <string>启用内存消耗监控</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_7">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QLabel" name="label_fixed_9">
+       <property name="text">
+        <string>检测阈值</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="lineEdit_ram_range">
+       <property name="text">
+        <string/>
        </property>
       </widget>
      </item>
@@ -229,7 +260,7 @@
      <item>
       <widget class="QCheckBox" name="checkBox_Show_Heartbeat">
        <property name="text">
-        <string> 显示心跳信号</string>
+        <string>显示心跳信号</string>
        </property>
       </widget>
      </item>
