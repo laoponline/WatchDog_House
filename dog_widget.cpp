@@ -3,6 +3,10 @@
 /// 同时，一定时间没有接收到Socket心跳信号以后，则认为目标已经假死或者进入功能、逻辑的死循环
 ///
 ///
+///
+///
+
+#pragma execution_character_set("utf-8")   //告诉mscv 采用utf-8编码
 #include "dog_widget.h"
 #include "ui_dog_widget.h"
 

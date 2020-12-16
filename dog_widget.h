@@ -1,4 +1,6 @@
-﻿#ifndef DOG_WIDGET_H
+﻿#pragma execution_character_set("utf-8")   //告诉mscv 采用utf-8编码
+
+#ifndef DOG_WIDGET_H
 #define DOG_WIDGET_H
 
 #include <QWidget>

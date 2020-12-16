@@ -16,6 +16,7 @@
 ///
 ///
 
+#pragma execution_character_set("utf-8")   //告诉mscv 采用utf-8编码
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -26,10 +27,14 @@ MainWindow::MainWindow(QWidget *parent) :
 {
 
      ui->setupUi(this);
-     //QDir::setCurrent(QCoreApplication::applicationDirPath());   //将默认路径设置到当前的exe目录文件下
+     qDebug()<<"before current="<<QDir::current()<<"  app path="<<QCoreApplication::applicationDirPath();
+     QDir::setCurrent(QCoreApplication::applicationDirPath());   //将默认路径设置到当前的exe目录文件下
+    qDebug()<<"after current="<<QDir::current();
 
      QSettings ini_setting(INT_PATH,QSettings::IniFormat);   //设置文件读取
+      qDebug()<<"ini path ="<<ini_setting.fileName();
      ini_setting.beginGroup("System");
+
 
     /*************窗口初始化*****************/
 

@@ -1,3 +1,5 @@
+#pragma execution_character_set("utf-8")   //告诉mscv 采用utf-8编码
+
 #ifndef DIALOG_SYSTEM_CONFIG_H
 #define DIALOG_SYSTEM_CONFIG_H
 

@@ -1,9 +1,13 @@
-﻿#ifndef SYSTEM_RESOURCE_USAGE_H
+﻿#pragma execution_character_set("utf-8")   //告诉mscv 采用utf-8编码
+
+#ifndef SYSTEM_RESOURCE_USAGE_H
 #define SYSTEM_RESOURCE_USAGE_H
 
 #include <QObject>
 #include <QDebug>
 #include <QTimer>
+#include <QDir>
+#include <QApplication>
 
 #pragma comment(lib,"Kernel32.lib")
 #pragma comment(lib,"Psapi.lib")
