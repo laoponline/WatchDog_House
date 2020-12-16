@@ -11,13 +11,14 @@
 /// 版本0.1 20201213
 /// 1. 加入了系统资源监控功能，可以监控CPU 内存 硬盘的使用量
 /// 2. 实装优化了看门狗的Log写入文件功能
+/// 3. 在看门狗内加入了RAM占用统计和表格
+///
+///
+/// todo 欠缺“另存为文件”和LOG存储到文件功能未验证
 ///
 ///
 ///
-///
-
 #pragma execution_character_set("utf-8")   //告诉mscv 采用utf-8编码
-
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
@@ -27,12 +28,16 @@ MainWindow::MainWindow(QWidget *parent) :
 {
 
      ui->setupUi(this);
-     qDebug()<<"before current="<<QDir::current()<<"  app path="<<QCoreApplication::applicationDirPath();
+     //qDebug()<<"before current="<<QDir::current()<<"  app path="<<QCoreApplication::applicationDirPath();
      QDir::setCurrent(QCoreApplication::applicationDirPath());   //将默认路径设置到当前的exe目录文件下
-    qDebug()<<"after current="<<QDir::current();
+    //qDebug()<<"after current="<<QDir::current();
+
+     setAttribute(Qt::WA_DeleteOnClose);       //设定窗口关闭后就会析构，不加会引起程序UI关闭后留下后台线程
+     setWindowFlags(Qt::CustomizeWindowHint | Qt::WindowMinimizeButtonHint | Qt::WindowMaximizeButtonHint);
+
 
      QSettings ini_setting(INT_PATH,QSettings::IniFormat);   //设置文件读取
-      qDebug()<<"ini path ="<<ini_setting.fileName();
+     // qDebug()<<"ini path ="<<ini_setting.fileName();
      ini_setting.beginGroup("System");
 
 

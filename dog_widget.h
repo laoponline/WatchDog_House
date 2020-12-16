@@ -12,11 +12,14 @@
 #include "dialog_dog_config.h"
 
 
+#define TABLE_TIME_PERIOD_SEC 60*60   //显示的图标，从左至右的总时间 60秒*分钟数
+#define DATA_TYPE_CPU_USAGE 0
+#define DATA_TYPE_RAM_USAGE 1
 
 #define STATE_IDLE 0
 #define STATE_WORKING 1
 #define COUNT_DOWN_DEFAULT 30         //默认喂狗时间30s
-#define RAM_SIZE_LOG_COUNT 5   //默认5个位置用于记录RAM消耗历史值
+#define RAM_LOG_SIZE 50   //默认5个位置用于记录RAM消耗历史值
 #define DOG_VERSION "0.1"
 
 namespace Ui {
@@ -51,7 +54,10 @@ private slots:
     void Socket_Disconnected();
     void Socket_Read();
     void Socket_Timeout();
-    void Socket_Feed(int ms);
+    void Socket_Feed(int ms  = 0);
+    void Plot_X_AtuoRange(QCustomPlot *customPlot, double time);
+    void Plot_Add_Data(int type, QVariant data);
+    void SLOT_Show_Tracer(QMouseEvent *event);
 signals:
     void Config_Return(QString target_name, int ret, QString new_name);
 
@@ -90,8 +96,10 @@ private:
     QTextStream log_write;
 
     /********内存监控相关********/
+    bool Ram_Check_Enabled = false;
+    int Ram_Check_Count = 0;
     void Plot_Setup(QCustomPlot *customPlot);
-    unsigned long long ram_size_log[RAM_SIZE_LOG_COUNT];   //用于记录前面5次内存消耗量。如果内存消耗都不变，有可能是发生了问题
+    unsigned long long ram_size_log[RAM_LOG_SIZE];   //用于记录前面5次内存消耗量。如果内存消耗都不变，有可能是发生了问题
     int ram_size_ptr = 0;
     QCPAxis *yAxis1;
     QCPAxis *yAxis2;
@@ -100,6 +108,7 @@ private:
     QCPItemLine *arrow = nullptr;   // 箭头
 
 
+    void Ram_Usage_Check(unsigned long long  ram_usage);
 };
 
 #endif // DOG_WIDGET_H

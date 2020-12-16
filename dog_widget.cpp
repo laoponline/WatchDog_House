@@ -28,6 +28,8 @@ Dog_Widget::Dog_Widget(QWidget *parent, QString config_name) :
 
 
     /**************控件显示初始化*************************/
+    Plot_Setup(ui->widget_graphicsView);
+
     ui->label_Version->setText(tr("Ver:%1").arg(DOG_VERSION));
 
     ui->lineEdit_target_position->setText(ini_setting.value("Target_Paht").toString());
@@ -61,7 +63,7 @@ Dog_Widget::Dog_Widget(QWidget *parent, QString config_name) :
 
 
 
-    //Log_Add(QString::fromLocal8Bit("已启用PID监控"));
+    //Log_Add(tr("已启用PID监控"));
     pid_watch_timer = new QTimer(this);
     socket_watch_timer = new QTimer(this);
 //    pid_watch_timer->setInterval(count_down*1000);   //隔一段时间清除一次串口数据记录
@@ -83,7 +85,7 @@ Dog_Widget::Dog_Widget(QWidget *parent, QString config_name) :
 
     if ((ini_setting.value("PID_Enabled","false").toString() == "false") && (ini_setting.value("Socket_Enabled","false").toString() == "false"))  //如果socket和pid都没有启动的话
     {
-       Log_Add(QString::fromLocal8Bit("未启用任何监听，请重新配置"));
+       Log_Add(tr("未启用任何监听，请重新配置"));
        ui->pushButton_Start->setEnabled(false);
 
     } else {
@@ -96,6 +98,7 @@ Dog_Widget::Dog_Widget(QWidget *parent, QString config_name) :
        } else {
            ui->lineEdit_target_name->setEnabled(false);
            ui->lineEdit_countdown_PID->setEnabled(false);
+           ui->progressBar_PID->setValue(0);
            pid_enabled = false;
        }
 
@@ -108,13 +111,25 @@ Dog_Widget::Dog_Widget(QWidget *parent, QString config_name) :
        } else {
            ui->lineEdit_Dog_port->setEnabled(false);
            ui->lineEdit_countdown_socket->setEnabled(false);
+           ui->progressBar_socket->setValue(0);
            socket_enabled = false;
        }
 
 
+       if (ini_setting.value("Ram_Check_Enabled","false").toString() == "true")             //是否进行Ram检测
+       {
+           Ram_Check_Enabled = true;
+           int pid_countdown = ini_setting.value("PID_Count_Down",COUNT_DOWN_DEFAULT).toInt();
+           int ram_duration = ini_setting.value("Ram_Duration",COUNT_DOWN_DEFAULT).toInt();
+           Ram_Check_Count = ram_duration / pid_countdown;  //计算需要统计的次数
+           qDebug()<<"Ram check enabled, check count = "<<Ram_Check_Count;
+           if (Ram_Check_Count > RAM_LOG_SIZE)  //不能超过一定范围
+               Ram_Check_Count = RAM_LOG_SIZE;
+       }
 
        if (ini_setting.value("Auto_Start","false").toString() == "true")             //如果需要自动启动，直接通过按钮实现
            on_pushButton_Start_clicked();
+
     }
 
     ini_setting.endGroup();
@@ -136,7 +151,121 @@ void Dog_Widget::stop()
 }
 
 
+//停止当前的工作，准备被删除
+void Dog_Widget::Stop_Working()
+{
 
+    state = STATE_IDLE;
+
+}
+
+
+
+//对目标进行重启
+void Dog_Widget::reset_target(QString* return_log)
+{
+    QString log;
+    QString target_name = ui->lineEdit_target_name->text();
+    QProcess *p = new QProcess;
+
+    {
+        p->start(QString("tasklist"));
+        p->waitForFinished();
+        QString temp =  p->readAllStandardOutput();
+        if (temp.contains(target_name))       //寻找目前是否存在目标名称的进程，有的话才结束
+          {
+            log +=  target_name + tr("已找到，正在结束...");
+            p->start(QString("taskkill /im %1 /f").arg(target_name));   //根据目标进程名称关闭程序
+            p->waitForFinished();
+            QString temp =  QString::fromLocal8Bit(p->readAllStandardOutput());
+            log += temp;
+          }
+        else log += target_name + tr("不存在；");
+    }
+
+
+    QString path = ui->lineEdit_target_position->text(); //获取目标程序的位置
+    QString arg = ui->lineEdit_target_arg->text();   //运行参数
+    QString dir = QDir(path).absolutePath();
+    path += " " + arg;
+    qDebug()<<"full path with arg = "<<path;
+    qDebug()<<"full dir  = "<<dir;
+
+    log += tr("启动程序...");
+
+    if (p->startDetached(path))    //启动目标程序。如果不用detached，会导致看门狗阻塞，等到目标程序退出后才会继续。
+    {
+        log += tr("成功！");
+
+        p->start(QString("tasklist"));
+        p->waitForFinished();
+        QString temp =  p->readAllStandardOutput();
+        QStringList all_process = temp.split("\r");      //将查找进程是否存在的列表进行分割，进一步寻找进程名称
+        //qDebug()<<"line_count="<<all_process.size();
+
+        foreach(QString line,all_process)
+        {
+            if (line.contains(target_name))
+            {
+                qDebug()<<line;
+                QStringList line_index = line.split(' ',QString::SkipEmptyParts); //空白部分去除的字符串分割
+                  qDebug()<<line_index.at(1);
+                 ui->lineEdit_target_pid->setText(line_index.at(1));
+                break;
+            }
+
+        }
+
+        log += "pid="+ui->lineEdit_target_pid->text();
+    }
+    else {
+
+         log += tr("失败！error=") + p->errorString();
+    }
+
+    *return_log += log;
+
+    delete p;
+}
+
+
+
+void Dog_Widget::ui_refresh()
+{
+
+    if (pid_enabled)    //如果需要Pid监控,则刷新进度条为剩余存活时间
+    {
+        int left_ms = pid_countdown_timer.remainingTime();
+        ui->progressBar_PID->setValue(left_ms/(ui->lineEdit_countdown_PID->text().toInt()*10));
+    }
+
+    if (socket_enabled)    //如果需要Pid监控,则刷新进度条为剩余存活时间
+    {
+        int left_ms = socket_countdown_timer.remainingTime();
+        ui->progressBar_socket->setValue(left_ms/(ui->lineEdit_countdown_socket->text().toInt()*10));
+    }
+
+    if (my_socket != nullptr)
+    {
+        if (my_socket->isOpen())  //如果socket已经连接了
+        {
+            ui->lineEdit_target_IP->setText(my_socket->peerAddress().toString());  //显示数据
+            ui->lineEdit_target_port->setText(QString::number( my_socket->peerPort()));
+        } else {
+            ui->lineEdit_target_IP->setText("");
+            ui->lineEdit_target_port->setText("");
+        }
+    } else {
+        ui->lineEdit_target_IP->setText("");
+        ui->lineEdit_target_port->setText("");
+    }
+
+}
+
+
+
+
+/**********绘图相关的函数************/
 void Dog_Widget::Plot_Setup(QCustomPlot *customPlot)
 {
     qDebug("sensor Setup Plot: start...");
@@ -152,20 +281,25 @@ void Dog_Widget::Plot_Setup(QCustomPlot *customPlot)
 
     //添加坐标轴
    // xAxis = customPlot->axisRect()->addAxis(QCPAxis::atBottom);
-    yAxis1 = customPlot->axisRect()->addAxis(QCPAxis::atLeft);
-    yAxis2 = customPlot->axisRect()->addAxis(QCPAxis::atLeft);
+    yAxis1 = customPlot->axisRect()->addAxis(QCPAxis::atLeft);   //显示RAM的坐标
+    yAxis1->setVisible(true);
+    yAxis1->setLabel("RAM(kb)");
+    yAxis1->setTickLabelSide(QCPAxis::lsInside);    //数字显示在内侧
+
+    yAxis2 = customPlot->axisRect()->addAxis(QCPAxis::atRight);   //显示CPU的坐标
+    yAxis2->setVisible(true);
+    yAxis2->setLabel("CPU");
+    yAxis2->setTickLabelSide(QCPAxis::lsInside);    //数字显示在内侧
 
 
-    yAxis1->setVisible(false);
-    yAxis2->setVisible(false);
+
     //更改横轴为时间轴
-
-    customPlot->xAxis->setLabel(""); //设置X轴的标签为空白
+    //customPlot->xAxis->setLabel("Time"); //设置X轴的标签
     //customPlot->xAxis->setTickLabelSide(QCPAxis::lsInside);    //数字显示在内侧
     QSharedPointer<QCPAxisTickerTime> timeTicker(new QCPAxisTickerTime);  //设计一个指向新的QCPAxisTickerTime的指针
     timeTicker->setTimeFormat("%d-%h:%m:%s");                       //时间显示的格式
     timeTicker->setTickCount(10);
-    customPlot->xAxis->setTickLabelRotation(30);                                           //调整显示角度
+    customPlot->xAxis->setTickLabelRotation(20);                                           //调整显示角度
     customPlot->xAxis->setTicker(timeTicker);
 
 
@@ -174,25 +308,28 @@ void Dog_Widget::Plot_Setup(QCustomPlot *customPlot)
      QPalette pa;
 
     customPlot->addGraph(customPlot->xAxis,yAxis1);
-    customPlot->graph(0)->setPen(QPen(QColor(255, 0, 0))); // 红色显示CPU占用
+    customPlot->graph(0)->setPen(QPen(QColor(255, 0, 0))); // 红色显示RAM占用
     customPlot->graph(0)->setAdaptiveSampling(true);
-    customPlot->graph(0)->setName("Cpu");
-    yAxis1->setRange(-20,100);
+    customPlot->graph(0)->setName("Ram");
+    yAxis1->setRange(0,100000);
 
 
 
     customPlot->addGraph(customPlot->xAxis,yAxis2);
-    customPlot->graph(1)->setPen(QPen(QColor(0, 255, 0))); // 绿色显示RAM占用
+    customPlot->graph(1)->setPen(QPen(QColor(0, 0, 255))); // 蓝色显示RCUP占用
     customPlot->graph(1)->setAdaptiveSampling(true);
-    customPlot->graph(1)->setName("Ram");
-    yAxis2->setRange(300,1100);
+    customPlot->graph(1)->setName("Cpu");
+    yAxis2->setRange(0,100);
 
     customPlot->setBackground(QColor(255,255,255));             //设置背景颜色
+    customPlot->legend->setBrush(QColor(255,255,255,0));//legend背景色设为白色但背景透明，允许图像在legend区域可见
+    customPlot->legend->setVisible(true);   //显示图例
+
 
     customPlot->replot(QCustomPlot::rpQueuedReplot);
 
     tracer = new QCPItemTracer(customPlot);
-    tracer->setGraph(customPlot->graph(5)); //游标设置为电压，保证每个数据都会有
+    tracer->setGraph(customPlot->graph(0)); //游标设置为ram，保证每个数据都会有
     tracer->setStyle(QCPItemTracer::tsCrosshair);  //游标形状
     tracer->setPen(QPen(Qt::red));
     tracer->setBrush(Qt::red);
@@ -230,13 +367,168 @@ void Dog_Widget::Plot_Setup(QCustomPlot *customPlot)
 
 
     connect(customPlot, SIGNAL(mouseMove(QMouseEvent*)), this,SLOT(SLOT_Show_Tracer(QMouseEvent*)));
-    connect(customPlot, SIGNAL(mousePress(QMouseEvent*)), this,SLOT(SLOT_Show_Tracer(QMouseEvent*)));
+    //connect(customPlot, SIGNAL(mousePress(QMouseEvent*)), this,SLOT(SLOT_Show_Tracer(QMouseEvent*)));
 
      qDebug("sensor Setup Plot: end...");
 }
 
 
 
+void Dog_Widget::Plot_Add_Data(int type, QVariant data)
+{
+     double second_start_from_month;
+
+
+        QDateTime current_time = QDateTime::currentDateTime(); //现在时间
+        //current_data.DateTime = current_time.toString("yyyy-MM-dd hh:mm:ss");
+        QDateTime month_start_time = QDateTime::currentDateTime();   //本月开始时间
+        QDate month_start_date = current_time.date();
+        month_start_date.setDate(month_start_date.year(),month_start_date.month(),1);  //设置到本月一号
+        month_start_time.setDate(month_start_date);     //设置到本月一号的0点0分
+        QTime time_0(0,0);
+        month_start_time.setTime(time_0);
+
+        second_start_from_month = current_time.toSecsSinceEpoch()-month_start_time.toSecsSinceEpoch(); //从本月初到现在的秒数
+        second_start_from_month += 60*60*24;     //为了不显示0号，直接显示1号
+         qDebug()<<"Plot_Add_Data: second start from month = "<<second_start_from_month;
+
+
+
+    switch (type)
+    {
+     case DATA_TYPE_CPU_USAGE :
+        ui->widget_graphicsView->graph(1)->addData(second_start_from_month,data.toDouble());
+        qDebug()<<"add cpu usage data:"<<data.toDouble();
+        yAxis2->rescale();  //气压
+        yAxis2->setRangeLower(0);
+        yAxis2->setRangeUpper(yAxis2->range().upper+5);
+          break;
+
+     case DATA_TYPE_RAM_USAGE :
+        ui->widget_graphicsView->graph(0)->addData(second_start_from_month,data.toDouble());
+        qDebug()<<"add ram usage data:"<<data.toDouble();
+        yAxis1->rescale();     //Ram
+        yAxis1->setRangeLower(yAxis1->range().lower-10);
+        yAxis1->setRangeUpper(yAxis1->range().upper+10);
+        break;
+
+    default:
+
+        break;
+
+    }
+
+    int time = QDateTime::currentDateTime().toSecsSinceEpoch() - month_start_time.toSecsSinceEpoch(); //从本月初到现在的秒数
+    time += 60*60*24;     //为了不显示0号，直接显示1号
+
+
+
+    Plot_X_AtuoRange(ui->widget_graphicsView,second_start_from_month);  //重新绘图并调整X轴
+    ui->widget_graphicsView->replot(QCustomPlot::rpQueuedReplot);  //重新绘制
+}
+
+
+void Dog_Widget::Plot_X_AtuoRange(QCustomPlot *customPlot,double time)   //用于重新计算X轴的range,让X轴永远保持指定长度，在长度不足的情况下则自动拉伸。time是最新一个数据的时间参数。
+{
+
+    if ((time - customPlot->graph(0)->dataMainKey(0)) < TABLE_TIME_PERIOD_SEC)
+    {
+        customPlot->xAxis->setRange(customPlot->graph(0)->dataMainKey(0), time - customPlot->graph(0)->dataMainKey(0), Qt::AlignLeft);  //如果目前距离最早一个数据不超过xxx秒，则显示范围设置为全部范围
+    }
+    else {
+
+
+        for (int i = 0; i < customPlot->graphCount(); ++i)  //移除过老的数据
+        {
+
+            if (customPlot->graph(i)->dataMainKey(0) > 0.1 && (time - customPlot->graph(i)->dataMainKey(0)) > TABLE_TIME_PERIOD_SEC)        //如果其中一个数据的长度超标了
+            {
+                int count = customPlot->graph(i)->dataCount();
+                customPlot->graph(i)->data()->removeBefore(customPlot->graph(i)->dataMainKey(count-1) - TABLE_TIME_PERIOD_SEC);  // 移除最前面的数据
+            }
+
+        }
+
+        customPlot->xAxis->setRange(customPlot->graph(0)->dataMainKey(0), TABLE_TIME_PERIOD_SEC, Qt::AlignLeft);  //如果超过xxx秒,则显示固定范围
+        //customPlot->graph(0)->data()->removeBefore(customPlot->graph(0)->dataMainKey(0)+1);  // 移除最前面的数据
+        }
+
+
+}
+
+
+void Dog_Widget::SLOT_Show_Tracer(QMouseEvent* event)
+{
+
+    QCustomPlot *customPlot = ui->widget_graphicsView;
+    double x = customPlot->xAxis->pixelToCoord(event->pos().x());
+    double x_pos = x;
+
+    //for(int i=0;i<1;i++)//ui->widget9->graph(0)->dataCount()
+    //{
+    double cpu_usage = 0;
+    double ram_usage = 0;
+
+    QSharedPointer<QCPGraphDataContainer> tmpContainer;
+    tmpContainer = tracer->graph()->data();
+    //使用二分法快速查找所在点数据！！！敲黑板，下边这段是重点
+    int low = 0, high = tmpContainer->size();
+    while(high > low)
+    {
+        int middle = (low + high) / 2;
+        if(x < tmpContainer->constBegin()->mainKey() ||         //如果在范围之外
+                x > (tmpContainer->constEnd()-1)->mainKey())
+            break;
+
+        if(x == (tmpContainer->constBegin() + middle)->mainKey())      //此时正好落在某一个数据点上
+        {
+            ram_usage = (customPlot->graph(0)->data()->constBegin() + middle)->mainValue();
+            cpu_usage = (customPlot->graph(1)->data()->constBegin() + middle)->mainValue();
+            break;
+        }
+        if(x > (tmpContainer->constBegin() + middle)->mainKey())
+        {
+            low = middle;
+        }
+        else if(x < (tmpContainer->constBegin() + middle)->mainKey())
+        {
+            high = middle;
+        }
+
+
+        if(high - low <= 1)     //如果落在某两个点之间，需要插值计算所在位置数据
+        {
+            x = (tmpContainer->constBegin() + low)->mainKey();//选取较小值 不会做插值计算
+            ram_usage = (customPlot->graph(0)->data()->constBegin() + low)->mainValue();
+            cpu_usage = (customPlot->graph(1)->data()->constBegin() + low)->mainValue();
+        }
+
+    }
+
+    QString x_datetime = QDateTime::fromTime_t(x).toString("hh:mm:ss");   //将X轴的数字转换成可读的时间
+    //tracer->position->setCoords(x, temp);
+    tracer->setGraphKey(x);    //设置游标的X轴位置
+    tracer->updatePosition();
+    //label->position->setCoords(-10, customPlot->yAxis->range().center());  //
+                   if (x < customPlot->xAxis->range().center())   //根据X的位置，对标签进行左右偏移
+                   {
+                       label->position->setCoords(20, customPlot->yAxis->range().center());
+                      // arrow->start->setCoords(0,0);
+                   }//
+                   else
+                   {
+                       label->position->setCoords(-130, customPlot->yAxis->range().center());  //
+                      // arrow->start->setCoords(customPlot->xAxis->range().size()/6,0);
+                   }
+
+    label->setText(QString("%1\r\n ram_usage:%2kb\r\n cpu_usage:%3\r\n").arg(tr("详细数据")).arg(ram_usage,2,'g').arg((int)cpu_usage));//显示游标内容
+    //}
+    customPlot->replot();
+}
+
+
+
+/**********LOG相关的函数************************/
 void Dog_Widget::Log_Setup()       //设置系统log
 {
     qDebug("Setup Log: start...");
@@ -298,46 +590,8 @@ void Dog_Widget::Log_Add(QString index, QString target_name)  //写入LOG用
 }
 
 
-void Dog_Widget::ui_refresh()
-{
 
-    if (pid_enabled)    //如果需要Pid监控,则刷新进度条为剩余存活时间
-    {
-        int left_ms = pid_countdown_timer.remainingTime();
-        ui->progressBar_PID->setValue(left_ms/(ui->lineEdit_countdown_PID->text().toInt()*10));
-    }
-
-    if (socket_enabled)    //如果需要Pid监控,则刷新进度条为剩余存活时间
-    {
-        int left_ms = socket_countdown_timer.remainingTime();
-        ui->progressBar_socket->setValue(left_ms/(ui->lineEdit_countdown_socket->text().toInt()*10));
-    }
-
-    if (my_socket != nullptr)
-    {
-        if (my_socket->isOpen())  //如果socket已经连接了
-        {
-            ui->lineEdit_target_IP->setText(my_socket->peerAddress().toString());  //显示数据
-            ui->lineEdit_target_port->setText(QString::number( my_socket->peerPort()));
-        } else {
-            ui->lineEdit_target_IP->setText("");
-            ui->lineEdit_target_port->setText("");
-        }
-    } else {
-        ui->lineEdit_target_IP->setText("");
-        ui->lineEdit_target_port->setText("");
-    }
-
-}
-
-//停止当前的工作，准备被删除
-void Dog_Widget::Stop_Working()
-{
-
-    state = STATE_IDLE;
-
-}
-
+/**********PID检查相关的内容*************/
 
 //PID的超时，仅仅检查PID是否存在作为是否要重新启动目标的依据
 void Dog_Widget::PID_Timeout()
@@ -359,7 +613,7 @@ void Dog_Widget::PID_Timeout()
             QString temp =  p->readAllStandardOutput();
             if (!temp.contains(target_name))       //寻找目前是否存在目标名称的进程，没有的话要启动
             {
-                QString log = QString::fromLocal8Bit("PID看门狗复位：");
+                QString log = tr("PID看门狗复位：");
                 reset_target(&log);
                 Log_Add(log);
             }
@@ -376,8 +630,11 @@ void Dog_Widget::PID_Timeout()
                           qDebug()<<"pid = "<<line_index.at(1)<<" Ram = "<<line_index.at(4);
                          ui->lineEdit_target_pid->setText(line_index.at(1));  //显示PID
 
-                         ram_size_log[ram_size_ptr] = line_index.at(4).toInt();
-                         qDebug("ram_size_log[%d] = %llu",ram_size_ptr,ram_size_log[ram_size_ptr]);
+                         QString ram_data = line_index.at(4);
+                         ram_data.remove(',');  //去掉数字里的逗号
+                         unsigned long long  ram_usage = ram_data.toInt(); //计算Ram使用
+
+                         Ram_Usage_Check(ram_usage);  //Ram占用检测
                         break;
                     }
 
@@ -388,42 +645,36 @@ void Dog_Widget::PID_Timeout()
 }
 
 
-//Socket超时，不论PID是否存在，都要重新启动目标
-void Dog_Widget::Socket_Timeout()
+//Ram占用检测，如果超过一定时间内存占用未变化，则说明程序假死了，需要重启
+void Dog_Widget::Ram_Usage_Check(unsigned long long  ram_usage)
 {
 
-    socket_countdown_timer.setInterval(ui->lineEdit_countdown_socket->text().toInt()*1000);  //必须重新设置，不然会变成left_over + ms
-    QString log = tr("Socket看门狗复位：");
-    reset_target(&log);
-    Log_Add(log);
+    Plot_Add_Data(DATA_TYPE_RAM_USAGE, ram_usage / 1000.0); //绘图
 
-}
-
-
-//Socket喂狗函数
-void Dog_Widget::Socket_Feed(int ms = 0)
-{
-
-    if ((STATE_WORKING == state) && socket_countdown_timer.isActive())   //如果狗正在工作，重置喂狗倒计时器
+    if (Ram_Check_Enabled)  //如果要Check的话，有问题就要重启
     {
-        if (ms)   //如果有指定时间，则认为要延长指定的ms数
-        {
-            int left_over = socket_countdown_timer.remainingTime();
-            qDebug()<<"left over = "<<left_over<<" add "<<ms<<", interval = "<<socket_countdown_timer.interval();
-            if ((left_over + ms) > ui->lineEdit_countdown_socket->text().toInt()*1000)  //如果合计时长大于总时长，不得超过总时长
-                socket_countdown_timer.start();
-            else {
-                socket_countdown_timer.start(left_over + ms);   //设定为合计时长
-            }
-        }
-        else socket_countdown_timer.start(ui->lineEdit_countdown_socket->text().toInt()*1000);
+        ram_size_log[ram_size_ptr] = ram_usage;   //记录最近几个RAM消耗
+        qDebug("ram_size_log[%d] = %llu",ram_size_ptr,ram_size_log[ram_size_ptr]);
+        ram_size_ptr = (ram_size_ptr+1) % Ram_Check_Count;  //回环
 
+        unsigned long long  temp_ram_usage = ram_size_log[0];  //选取第一个进行对比
+        int i = 1;
+        for (;i<Ram_Check_Count;i++)  //遍历，如果有不一样的内存占用，就跳出
+        {
+            if (temp_ram_usage != ram_size_log[i])
+                break;
+        }
+
+        if (i == Ram_Check_Count)  //如果等于，则说明没有找到不一样的RAM占用值，说明RAM占用一直没变
+        {
+            Log_Add(tr("内存占用%1连续%2次未变化").arg(temp_ram_usage).arg(Ram_Check_Count));
+            QString log = tr("Ram统计看门狗复位：");
+            reset_target(&log);
+            Log_Add(log);
+        }
     }
 
 }
-
-
-
 
 void Dog_Widget::PID_Feed(QString target_name)
 {
@@ -431,80 +682,13 @@ void Dog_Widget::PID_Feed(QString target_name)
         pid_countdown_timer.start();
 
     if (ui->checkBox_show_heartbeat->isChecked())    //如果需要显示心跳信号
-        Log_Add(QString::fromLocal8Bit("收到PID心跳信号"),target_name);
+        Log_Add(tr("收到PID心跳信号"),target_name);
 }
 
 
 
 
-//对目标进行重启
-void Dog_Widget::reset_target(QString* return_log)
-{
-    QString log;
-    QString target_name = ui->lineEdit_target_name->text();
-    QProcess *p = new QProcess;
-
-    {
-        p->start(QString("tasklist"));
-        p->waitForFinished();
-        QString temp =  p->readAllStandardOutput();
-        if (temp.contains(target_name))       //寻找目前是否存在目标名称的进程，有的话才结束
-          {
-            log +=  target_name + QString::fromLocal8Bit("已找到，正在结束...");
-            p->start(QString("taskkill /im %1 /f").arg(target_name));   //根据目标进程名称关闭程序
-            p->waitForFinished();
-            QString temp =  QString::fromLocal8Bit(p->readAllStandardOutput());
-            log += temp;
-          }
-        else log += target_name + QString::fromLocal8Bit("不存在；");
-    }
-
-
-    QString path = ui->lineEdit_target_position->text(); //获取目标程序的位置
-    QString arg = ui->lineEdit_target_arg->text();   //运行参数
-    QString dir = QDir(path).absolutePath();
-    path += " " + arg;
-    qDebug()<<"full path with arg = "<<path;
-    qDebug()<<"full dir  = "<<dir;
-
-    log += QString::fromLocal8Bit("启动程序...");
-
-    if (p->startDetached(path))    //启动目标程序。如果不用detached，会导致看门狗阻塞，等到目标程序退出后才会继续。
-    {
-        log += QString::fromLocal8Bit("成功！");
-
-        p->start(QString("tasklist"));
-        p->waitForFinished();
-        QString temp =  p->readAllStandardOutput();
-        QStringList all_process = temp.split("\r");      //将查找进程是否存在的列表进行分割，进一步寻找进程名称
-        //qDebug()<<"line_count="<<all_process.size();
-
-        foreach(QString line,all_process)
-        {
-            if (line.contains(target_name))
-            {
-                qDebug()<<line;
-                QStringList line_index = line.split(' ',QString::SkipEmptyParts); //空白部分去除的字符串分割
-                  qDebug()<<line_index.at(1);
-                 ui->lineEdit_target_pid->setText(line_index.at(1));
-                break;
-            }
-
-        }
-
-        log += "pid="+ui->lineEdit_target_pid->text();
-    }
-    else {
-
-         log += tr("失败！error=") + p->errorString();
-    }
-
-    *return_log += log;
-
-    delete p;
-}
-
-
+/************Socket相关******************/
 ///新Socket连接进入的处理函数。如果当前没有已经建立的Socket连接，则放进新连接
 ///如果当前已经存在有效的连接，则放弃之前的，重新建立（之前的可能已经被重启了）
 void Dog_Widget::Get_Connection()
@@ -524,6 +708,40 @@ void Dog_Widget::Get_Connection()
     ui->lineEdit_target_IP->setText(my_socket->peerAddress().toString());  //显示数据
     ui->lineEdit_target_port->setText(QString::number( my_socket->peerPort()));
     Socket_Feed();   //主动喂狗，防止上来就发生重启
+}
+
+//Socket超时，不论PID是否存在，都要重新启动目标
+void Dog_Widget::Socket_Timeout()
+{
+
+    socket_countdown_timer.setInterval(ui->lineEdit_countdown_socket->text().toInt()*1000);  //必须重新设置，不然会变成left_over + ms
+    QString log = tr("Socket看门狗复位：");
+    reset_target(&log);
+    Log_Add(log);
+
+}
+
+
+//Socket喂狗函数
+void Dog_Widget::Socket_Feed(int ms)
+{
+
+    if ((STATE_WORKING == state) && socket_countdown_timer.isActive())   //如果狗正在工作，重置喂狗倒计时器
+    {
+        if (ms)   //如果有指定时间，则认为要延长指定的ms数
+        {
+            int left_over = socket_countdown_timer.remainingTime();
+            qDebug()<<"left over = "<<left_over<<" add "<<ms<<", interval = "<<socket_countdown_timer.interval();
+            if ((left_over + ms) > ui->lineEdit_countdown_socket->text().toInt()*1000)  //如果合计时长大于总时长，不得超过总时长
+                socket_countdown_timer.start();
+            else {
+                socket_countdown_timer.start(left_over + ms);   //设定为合计时长
+            }
+        }
+        else socket_countdown_timer.start(ui->lineEdit_countdown_socket->text().toInt()*1000);
+
+    }
+
 }
 
 
@@ -657,7 +875,7 @@ void Dog_Widget::Socket_Read()
 
 }
 
-
+/*****************按键响应***************/
 void Dog_Widget::on_pushButton_Start_clicked()
 {
     if (STATE_IDLE == state)
@@ -695,6 +913,10 @@ void Dog_Widget::on_pushButton_Start_clicked()
              Log_Add(tr("启动Socket监控"));
         }
 
+        if (Ram_Check_Enabled)
+           Log_Add(tr("Ram占用检测启动，次数=%1").arg(Ram_Check_Count));
+        else Log_Add(tr("Ram占用检测未启动"));
+
 
         ui->lineEdit_target_name->setEnabled(false);       //开始监控后自动关掉这两个可修改的部分
         ui->lineEdit_target_position->setEnabled(false);
@@ -702,7 +924,7 @@ void Dog_Widget::on_pushButton_Start_clicked()
         //ui->label_image->setPixmap(QPixmap::fromImage(QImage(":/image/Dog_awake.jpg")).scaled(ui->label_image->size()));
         QIcon icon = QIcon("./image/Dog_awake.jpg");      //设置图标等内容
 
-        ui->pushButton_Start->setText(QString::fromLocal8Bit("停止监控"));
+        ui->pushButton_Start->setText(tr("停止监控"));
         state = STATE_WORKING;
 
     }
@@ -716,6 +938,8 @@ void Dog_Widget::on_pushButton_Start_clicked()
             ui->lineEdit_target_name->setEnabled(true);       //开始监控后自动关掉这两个可修改的部分
             ui->lineEdit_target_position->setEnabled(true);
             ui->lineEdit_target_pid->setText("");
+            ui->progressBar_PID->setValue(0);
+
 
             Log_Add(tr("停止PID监控"));
         }
@@ -727,6 +951,7 @@ void Dog_Widget::on_pushButton_Start_clicked()
             Socket_Disconnected();   //断开socket
             ui->lineEdit_Dog_IP->setText("");  //清空显示
             //ui->lineEdit_Dog_port->setText("");
+            ui->progressBar_socket->setValue(0);
 
 
             if (my_server.isListening())    //先关闭server
@@ -738,7 +963,7 @@ void Dog_Widget::on_pushButton_Start_clicked()
 
         //ui->label_image->setPixmap(QPixmap::fromImage(QImage("/image/Dog_Sleep.png")).scaled(ui->label_image->size()));
         QIcon icon = QIcon("/image/Dog_Sleep.jpg");      //设置图标等内容
-        ui->pushButton_Start->setText(QString::fromLocal8Bit("开始监控"));
+        ui->pushButton_Start->setText(tr("开始监控"));
         state = STATE_IDLE;
     }
 
@@ -748,7 +973,7 @@ void Dog_Widget::on_pushButton_Start_clicked()
 
 void Dog_Widget::on_pushButton_Mannual_Reboot_clicked()
 {
-    QString log = QString::fromLocal8Bit("手动重启：");
+    QString log = tr("手动重启：");
     reset_target(&log);
 
     if ((STATE_WORKING == state) && pid_countdown_timer.isActive())   //如果狗正在工作，重置喂狗倒计时器
@@ -765,7 +990,7 @@ void Dog_Widget::on_pushButton_Mannual_Reboot_clicked()
 
 void Dog_Widget::on_pushButton_System_Config_clicked()
 {
-    Log_Add(QString::fromLocal8Bit("进行系统设置"));
+    Log_Add(tr("进行系统设置"));
     QString new_name;
     Dialog_Dog_Config *system_config_dlg = new Dialog_Dog_Config(this,my_name,&new_name);
     int ret = system_config_dlg->exec();       //展示设置界面，模态
