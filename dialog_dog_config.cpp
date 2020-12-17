@@ -41,6 +41,13 @@ Dialog_Dog_Config::Dialog_Dog_Config(QWidget *parent, QString config_name , QStr
         else ui->checkBox_PID_Enabled->setCheckState(Qt::Unchecked);
         ui->lineEdit_target_name->setText(ini_setting.value("PID_Name","").toString());
 
+        if (ini_setting.value("Ram_Check_Enabled","false").toString() == "true")             //是否进行Ram检测
+             ui->checkBox_Ram_Check_Enabled->setCheckState(Qt::Checked);
+        else ui->checkBox_Ram_Check_Enabled->setCheckState(Qt::Unchecked);
+        ui->lineEdit_ram_range->setText(ini_setting.value("Ram_Range","").toString());
+        ui->lineEdit_ram_duration->setText(ini_setting.value("Ram_Duration","").toString());
+
+
         if (ini_setting.value("Socket_Enabled","false").toString() == "true")             //是否启用socket监控
              ui->checkBox_Socket_Enabled->setCheckState(Qt::Checked);
         else ui->checkBox_Socket_Enabled->setCheckState(Qt::Unchecked);
@@ -105,11 +112,17 @@ void Dialog_Dog_Config::save_all()
     else ini_setting.setValue("Log_To_File_Enabled","false");
     ini_setting.setValue("Log_Path",ui->lineEdit_Log_Addr->text());  //Log保存位置
 
-    if (Qt::Checked == ui->checkBox_PID_Enabled->checkState()) //是否自动开始工作
+    if (Qt::Checked == ui->checkBox_PID_Enabled->checkState()) //pid检测
         ini_setting.setValue("PID_Enabled","true");
     else ini_setting.setValue("PID_Enabled","false");
     ini_setting.setValue("PID_Name",ui->lineEdit_target_name->text());  //目标运行参数
     ini_setting.setValue("PID_Count_Down",QString::number(ui->lineEdit_countdown_PID->text().toInt()));  //自动检查时间
+
+    if (Qt::Checked == ui->checkBox_Ram_Check_Enabled->checkState()) //是否进行Ram检测
+        ini_setting.setValue("Ram_Check_Enabled","true");
+    else ini_setting.setValue("Ram_Check_Enabled","false");
+    ini_setting.setValue("Ram_Range",ui->lineEdit_ram_range->text());
+    ini_setting.setValue("Ram_Duration",QString::number(ui->lineEdit_ram_duration->text().toInt()));  //自动检查时间
 
     if (Qt::Checked == ui->checkBox_Socket_Enabled->checkState()) //是否自动开始工作
         ini_setting.setValue("Socket_Enabled","true");
@@ -273,6 +286,7 @@ void Dialog_Dog_Config::on_pushButton_Target_Dir_Set_clicked()
         ui->lineEdit_target_position->setText(path);     //显示图片和路径
         QString file_name = QFileInfo(path).fileName();
         ui->lineEdit_target_name->setText(file_name);  // 截取文件名作为进程名
+        if (ui->lineEdit_dog_name->text().isEmpty())
         ui->lineEdit_dog_name->setText("Dog for "+file_name);
     }
 }

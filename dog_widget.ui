@@ -253,7 +253,7 @@
          <item>
           <widget class="QProgressBar" name="progressBar_socket">
            <property name="value">
-            <number>24</number>
+            <number>0</number>
            </property>
            <property name="textVisible">
             <bool>false</bool>
@@ -303,7 +303,7 @@
          <item>
           <widget class="QProgressBar" name="progressBar_PID">
            <property name="value">
-            <number>24</number>
+            <number>0</number>
            </property>
            <property name="textVisible">
             <bool>false</bool>
