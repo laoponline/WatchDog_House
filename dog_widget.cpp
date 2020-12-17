@@ -15,8 +15,10 @@ Dog_Widget::Dog_Widget(QWidget *parent, QString config_name) :
     ui(new Ui::Dog_Widget)
 {
     ui->setupUi(this);
-
     my_name = config_name ;
+
+    Log_Setup();  //首先设定LOG
+
     QSettings ini_setting(INT_PATH,QSettings::IniFormat);   //设置文件读取
     ini_setting.beginGroup("Dogs");
     ini_setting.beginGroup(my_name);
@@ -537,6 +539,7 @@ void Dog_Widget::Log_Setup()       //设置系统log
     ini_setting.beginGroup("Dogs");
     ini_setting.beginGroup(my_name);
 
+     qDebug()<<"Setup Log: log to file enable = "<<ini_setting.value("Log_To_File_Enabled","false").toString();
     if (ini_setting.value("Log_To_File_Enabled","false").toString() == "true")   //如果确认要进行LOG文件记录
     {
         QString log_path = ini_setting.value("Log_Path",LOG_PATH_DEFAULT).toString();
@@ -1024,5 +1027,59 @@ void Dog_Widget::Delay_Ms_UnBlocked(unsigned int msec)
     QTimer::singleShot(msec, &loop, SLOT(quit()));//创建单次定时器，槽函数为事件循环的退出函数
     loop.exec();//事件循环开始执行，程序会卡在这里，直到定时时间到，本循环被退出
 }
+
+
+
+void Dog_Widget::on_pushButton_Log_Saveto_clicked()
+{
+    QString save_path = QFileDialog::getSaveFileName(this,tr("另存为"),QCoreApplication::applicationDirPath(),tr("文本文件(*.txt)")); //选择路径
+    qDebug()<<"save file: save_path = "<<save_path;
+
+    if (save_path.isEmpty())
+        return;
+
+    QFile save_file;
+
+    save_file.setFileName(save_path);
+    bool open_success = save_file.open(QIODevice::ReadWrite | QIODevice::Append | QIODevice::Text);   //跳到最后，并且使用Text,这样endl会自动换行
+    qDebug()<<"save file : file open = "<<open_success;
+    if (open_success)
+    {
+        QTextStream file_write;
+        file_write.setDevice(&save_file);
+        file_write<<ui->textBrowser_Log->toPlainText()<<endl;
+        save_file.flush();   //保存数据
+        save_file.close();
+        QMessageBox::information(this,tr("保存成功"),tr("保存成功"));
+    } else {
+      QMessageBox::critical(this,tr("保存失败"),tr("保存失败：%1").arg(save_file.errorString()));
+      save_file.close();
+    }
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

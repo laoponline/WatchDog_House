@@ -58,6 +58,8 @@ private slots:
     void Plot_X_AtuoRange(QCustomPlot *customPlot, double time);
     void Plot_Add_Data(int type, QVariant data);
     void SLOT_Show_Tracer(QMouseEvent *event);
+    void on_pushButton_Log_Saveto_clicked();
+
 signals:
     void Config_Return(QString target_name, int ret, QString new_name);
 
