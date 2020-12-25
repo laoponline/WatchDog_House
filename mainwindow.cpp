@@ -16,7 +16,7 @@
 /// 4. 修复完成了Log保存到文件和手动另存为功能
 ///
 ///
-///
+///todo 计算CPU占用率的程序
 ///
 ///
 ///
@@ -80,8 +80,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
     /**************控件显示初始化*************************/
     ui->label_Version->setText(QString(DIALOG_NAME_MAIN) + ":" + SYSTEM_VERSION);       //显示版本信息
-    setAttribute(Qt::WA_DeleteOnClose);       //设定窗口关闭后就会析构
-    setWindowFlags(Qt::CustomizeWindowHint | Qt::WindowMinimizeButtonHint | Qt::WindowMaximizeButtonHint);    //不启用关闭按钮
 
 
 
