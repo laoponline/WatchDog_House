@@ -168,7 +168,7 @@ void Dog_Widget::reset_target(QString* return_log)
 {
     QString log;
     QString target_name = ui->lineEdit_target_name->text();
-    QProcess *p = new QProcess;
+    QProcess *p = new QProcess(this);
 
     {
         p->start(QString("tasklist"));
@@ -608,7 +608,7 @@ void Dog_Widget::PID_Timeout()
 
 
         QString target_name = ui->lineEdit_target_name->text();
-        QProcess *p = new QProcess;
+        QProcess *p = new QProcess(this);
 
 
             p->start(QString("tasklist"));
@@ -644,6 +644,7 @@ void Dog_Widget::PID_Timeout()
                 }
 
             }
+            delete p;
 
 }
 

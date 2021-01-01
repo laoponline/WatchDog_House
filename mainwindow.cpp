@@ -322,7 +322,7 @@ void MainWindow::Dog_Dealer(QString target_name, int index)
 
 void MainWindow::Tray_Icon_Setup()
 {
-    tray_icon = new QSystemTrayIcon;
+    tray_icon = new QSystemTrayIcon(this);
     QIcon icon = QIcon("./image/Dog_Sleep.jpg");      //设置图标等内容
     tray_icon->setIcon(icon);
     tray_icon->setToolTip(QString::fromLocal8Bit("看门狗已经最小化"));

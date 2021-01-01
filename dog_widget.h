@@ -39,7 +39,6 @@ public:
 public slots:
     void Stop_Working();
 private slots:
-    void Log_Add(QString index, QString target_name = QString::fromLocal8Bit("本地操作"));
     void on_pushButton_Start_clicked();
 
     void on_pushButton_Mannual_Reboot_clicked();
@@ -90,14 +89,18 @@ private:
 
     void Delay_Ms_UnBlocked(unsigned int msec);
     /*********LOG相关********/
+private:
     void Log_Setup();
     bool Log_to_file;
     QString log_addr;
     QTimer* log_clear_timer;
     QFile log_file;
     QTextStream log_write;
+private slots:
+    void Log_Add(QString index, QString target_name = QString::fromLocal8Bit("本地操作"));
 
     /********内存监控相关********/
+private:
     bool Ram_Check_Enabled = false;
     int Ram_Check_Count = 0;
     void Plot_Setup(QCustomPlot *customPlot);
