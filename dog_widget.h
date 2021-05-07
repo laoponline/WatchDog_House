@@ -84,7 +84,7 @@ private:
     QTcpSocket* my_socket = nullptr;
 
 
-    void PID_Feed(QString target_name);
+    void PID_Feed(QString target_name = "");
     void reset_target(QString *return_log);
 
     void Delay_Ms_UnBlocked(unsigned int msec);
