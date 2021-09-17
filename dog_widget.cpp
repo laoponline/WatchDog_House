@@ -26,6 +26,8 @@ Dog_Widget::Dog_Widget(QWidget *parent, QString config_name) :
 
     /**************系统参数初始化********************/
     int log_clear_time = ini_setting.value("Log_Clear_Duration",3600).toInt();
+    reboot_delay = ini_setting.value("Reboot_Delay_Ms",REBOOT_DELAY_DEFAULT).toInt();
+
 
 
 
@@ -192,6 +194,8 @@ void Dog_Widget::reset_target(QString* return_log)
     path += " " + arg;
     qDebug()<<"full path with arg = "<<path;
     qDebug()<<"full dir  = "<<dir;
+
+    Delay_Ms_UnBlocked(reboot_delay);
 
     log += tr("启动程序...");
 
@@ -616,9 +620,12 @@ void Dog_Widget::PID_Timeout()
             QString temp =  p->readAllStandardOutput();
             if (!temp.contains(target_name))       //寻找目前是否存在目标名称的进程，没有的话要启动
             {
+                reseting = true;
+                Socket_Feed();  //在重启的时候
                 QString log = tr("PID看门狗复位：");
                 reset_target(&log);
                 Log_Add(log);
+                reseting = false;
             }
             else
             {
@@ -719,6 +726,7 @@ void Dog_Widget::Socket_Timeout()
 {
 
     socket_countdown_timer.setInterval(ui->lineEdit_countdown_socket->text().toInt()*1000);  //必须重新设置，不然会变成left_over + ms
+    PID_Feed(tr("本地"));  //防止发生PID重启
     QString log = tr("Socket看门狗复位：");
     reset_target(&log);
     Log_Add(log);
@@ -846,7 +854,7 @@ void Dog_Widget::Socket_Read()
                             //countdown.start(object_content.toFloat()*1000);      //重启计时器，并设定时间
                             Socket_Feed(object_content.toFloat()*1000); //喂狗
                             if (ui->checkBox_show_heartbeat->isChecked())    //如果需要显示心跳信号
-                                Log_Add(tr("收到socket心跳信号,对方时间：%1").arg(message_time),target_name);
+                                Log_Add(tr("收到socket心跳信号,对方时间：%1,增加寿命%2s").arg(message_time).arg(object_content.toFloat()),target_name);
                         }
                         else  if (object == "setname")         //命名
                         {

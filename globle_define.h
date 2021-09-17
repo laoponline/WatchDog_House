@@ -61,11 +61,12 @@
 #define STATE_WORKING 1
 #define COUNT_DOWN_DEFAULT 30         //默认喂狗时间30s
 #define LOCAL_PORT_DEFAULT 8899  //默认本地监听端口
+#define REBOOT_DELAY_DEFAULT 500  //默认重启延时
 
 #define RETCODE_RESTART 5
 
 #define DIALOG_NAME_MAIN "DH"
-#define SYSTEM_VERSION "V0.1 R20201211"
+#define SYSTEM_VERSION "V0.2 R20210414"
 
 
 

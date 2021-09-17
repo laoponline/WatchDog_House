@@ -147,16 +147,6 @@
       </spacer>
      </item>
      <item>
-      <widget class="QLabel" name="label_fixed_10">
-       <property name="text">
-        <string>检测时间</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="lineEdit_ram_duration"/>
-     </item>
-     <item>
       <widget class="QLabel" name="label_fixed_9">
        <property name="text">
         <string>检测阈值</string>
@@ -169,6 +159,16 @@
         <string/>
        </property>
       </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="label_fixed_10">
+       <property name="text">
+        <string>检测时间</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="lineEdit_ram_duration"/>
      </item>
     </layout>
    </item>
@@ -252,6 +252,20 @@
         </size>
        </property>
       </spacer>
+     </item>
+     <item>
+      <widget class="QLabel" name="label_fixed_11">
+       <property name="text">
+        <string>目标重启延迟</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="lineEdit_reboot_delay">
+       <property name="text">
+        <string>500</string>
+       </property>
+      </widget>
      </item>
      <item>
       <widget class="QLabel" name="label_Fixed_15">

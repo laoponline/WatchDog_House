@@ -58,6 +58,9 @@ Dialog_Dog_Config::Dialog_Dog_Config(QWidget *parent, QString config_name , QStr
         else ui->checkBox_Show_Heartbeat->setCheckState(Qt::Unchecked);        
         ui->lineEdit_Log_Clear_Duration->setText(ini_setting.value("Log_Clear_Duration",LOG_CLEAR_DURATION).toString());
 
+        ui->lineEdit_reboot_delay->setText(ini_setting.value("Reboot_Delay_Ms",REBOOT_DELAY_DEFAULT).toString());
+
+
         ini_setting.endGroup();
 
 
@@ -134,6 +137,8 @@ void Dialog_Dog_Config::save_all()
         ini_setting.setValue("Show_Heartbeat","true");
     else ini_setting.setValue("Show_Heartbeat","false");
     ini_setting.setValue("Log_Clear_Duration",QString::number(ui->lineEdit_Log_Clear_Duration->text().toInt()));  //log清空时间
+
+    ini_setting.setValue("Reboot_Delay_Ms",QString::number(ui->lineEdit_reboot_delay->text().toInt()));  //软件重启间隔
 
 
      ini_setting.endGroup();

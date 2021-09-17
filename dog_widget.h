@@ -66,6 +66,7 @@ private:
     /**********基础项目***********/
     Ui::Dog_Widget *ui;
     QString my_name;
+    bool reseting = false;  //正在进行重启的标记位。如果为true，则说明其中某一项看门狗正在进行目标重启，不能再用其它方式同时再进行操作，否则可能多重启动
 
     QTimer pid_countdown_timer;   //PID检查倒计时
     QTimer socket_countdown_timer;   //Socket看门狗倒计时
@@ -73,6 +74,7 @@ private:
     int state;
     bool pid_enabled;
     bool socket_enabled;
+    int reboot_delay = REBOOT_DELAY_DEFAULT;
 
     QString socket_receive_buffer;   //接收到的Socket数据
     QTimer* ui_timer;
