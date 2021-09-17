@@ -52,6 +52,10 @@ Dialog_Dog_Config::Dialog_Dog_Config(QWidget *parent, QString config_name , QStr
              ui->checkBox_Socket_Enabled->setCheckState(Qt::Checked);
         else ui->checkBox_Socket_Enabled->setCheckState(Qt::Unchecked);
         ui->lineEdit_local_port->setText(ini_setting.value("Local_Port",LOCAL_PORT_DEFAULT).toString());
+        if (ini_setting.value("Socket_External_Only","false").toString() == "true")             //是否启用socket监控
+             ui->checkBox_socket_for_external->setCheckState(Qt::Checked);
+        else ui->checkBox_socket_for_external->setCheckState(Qt::Unchecked);
+
 
         if (ini_setting.value("Show_Heartbeat","false").toString() == "true")             //显示心跳信号
              ui->checkBox_Show_Heartbeat->setCheckState(Qt::Checked);
@@ -127,9 +131,12 @@ void Dialog_Dog_Config::save_all()
     ini_setting.setValue("Ram_Range",ui->lineEdit_ram_range->text());
     ini_setting.setValue("Ram_Duration",QString::number(ui->lineEdit_ram_duration->text().toInt()));  //自动检查时间
 
-    if (Qt::Checked == ui->checkBox_Socket_Enabled->checkState()) //是否自动开始工作
+    if (Qt::Checked == ui->checkBox_Socket_Enabled->checkState()) //Socket是否有效
         ini_setting.setValue("Socket_Enabled","true");
     else ini_setting.setValue("Socket_Enabled","false");
+    if (Qt::Checked == ui->checkBox_socket_for_external->checkState()) //是否仅接受外部重启
+        ini_setting.setValue("Socket_External_Only","true");
+    else ini_setting.setValue("Socket_External_Only","false");
     ini_setting.setValue("Local_Port",ui->lineEdit_local_port->text());  //本地端口
     ini_setting.setValue("Socket_Count_Down",QString::number(ui->lineEdit_countdown_Socket->text().toInt()));  //自动复位时间
 

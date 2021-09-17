@@ -112,6 +112,11 @@ Dog_Widget::Dog_Widget(QWidget *parent, QString config_name) :
            ui->lineEdit_Dog_port->setText(ini_setting.value("Local_Port",LOCAL_PORT_DEFAULT).toString());
            ui->lineEdit_countdown_socket->setText(ini_setting.value("Socket_Count_Down",COUNT_DOWN_DEFAULT).toString());    //界面上的各种参数显示
            socket_enabled = true;
+           if (ini_setting.value("Socket_External_Only","false").toString() == "true")
+            socket_external_only = true;
+           else socket_external_only = false;
+
+
        } else {
            ui->lineEdit_Dog_port->setEnabled(false);
            ui->lineEdit_countdown_socket->setEnabled(false);
@@ -142,8 +147,10 @@ Dog_Widget::Dog_Widget(QWidget *parent, QString config_name) :
 
 Dog_Widget::~Dog_Widget()
 {
+    closing_window = true;
     if (STATE_WORKING == state)  //如果还在工作，则要先关闭断开
         on_pushButton_Start_clicked();
+
     delete ui;
 }
 
@@ -184,7 +191,7 @@ void Dog_Widget::reset_target(QString* return_log)
             log +=  target_name + tr("已找到，正在结束...");
             p->start(QString("taskkill /im %1 /f").arg(target_name));   //根据目标进程名称关闭程序
             p->waitForFinished();
-            QString temp =  QString::fromLocal8Bit(p->readAllStandardOutput());
+            QString temp =  QString(p->readAllStandardOutput());
             log += temp;
           }
         else log += target_name + tr("不存在；");
@@ -248,7 +255,7 @@ void Dog_Widget::ui_refresh()
         ui->progressBar_PID->setValue(left_ms/(ui->lineEdit_countdown_PID->text().toInt()*10));
     }
 
-    if (socket_enabled)    //如果需要Pid监控,则刷新进度条为剩余存活时间
+    if (socket_enabled && !socket_external_only)    //如果需要Pid监控,则刷新进度条为剩余存活时间
     {
         int left_ms = socket_countdown_timer.remainingTime();
         ui->progressBar_socket->setValue(left_ms/(ui->lineEdit_countdown_socket->text().toInt()*10));
@@ -741,6 +748,9 @@ void Dog_Widget::Socket_Timeout()
 void Dog_Widget::Socket_Feed(int ms)
 {
 
+    if (socket_external_only)  //socket仅用于外部重启的时候，则不需要Socket喂狗了
+        return;
+
     if ((STATE_WORKING == state) && socket_countdown_timer.isActive())   //如果狗正在工作，重置喂狗倒计时器
     {
         if (ms)   //如果有指定时间，则认为要延长指定的ms数
@@ -786,14 +796,18 @@ void Dog_Widget::Socket_Disconnected()
         disconnect(my_socket, SIGNAL(readyRead()), this, SLOT(Socket_Read())); // 会移进线程里
         disconnect(my_socket, SIGNAL(disconnected()), this, SLOT(Socket_Disconnected()));     //子线程断开的时候会进行处理，删除对应的列表项
 
-        int wait_time_out = 0;     //开始等待连接关闭
-        while (wait_time_out < 10)  //最多等待100ms
+        if (!closing_window)
         {
-            Delay_Ms_UnBlocked(10);   //等待10个MS,非阻塞
-            if (my_socket->state() == QAbstractSocket::UnconnectedState)
-                break;
-            wait_time_out ++;
+            int wait_time_out = 0;     //开始等待连接关闭
+            while (wait_time_out < 10)  //最多等待100ms
+            {
+                Delay_Ms_UnBlocked(10);   //等待10个MS,非阻塞
+                if (my_socket->state() == QAbstractSocket::UnconnectedState)
+                    break;
+                wait_time_out ++;
+            }
         }
+
 
         delete my_socket; //彻底释放
         my_socket = nullptr;
@@ -814,6 +828,7 @@ void Dog_Widget::Socket_Read()
     //    "name::abc;time::2018-09-19 13.52.55;object::alive=15;";
     //    "name::abc;time::2018-09-19 13:52:55;object::setname=abc;";
     //    "name::abc;time::2018-09-19 13.52.55;object::log=restart;";
+        //    "name::abc;time::2018-09-19 13.52.55;object::reset=1;";
 
     QString target_name;
     QString message_time;
@@ -872,6 +887,23 @@ void Dog_Widget::Socket_Read()
                             QString index = object_content;
                             Log_Add(index,target_name);
                         }
+                        else if (object == "reset")        //log请求指令
+                        {
+                            qDebug()<<"get reset:"<<object<<":"<<object_content;
+
+                            int delay = object_content.toInt();
+                            Log_Add(tr("收到socket重启请求,对方时间：%1,延迟=%2ms").arg(message_time).arg(delay),target_name);
+                            if (delay > 0)
+                            {
+                                Delay_Ms_UnBlocked(delay);   //等待对应的时间
+                            }
+                            Socket_Timeout();
+                            if (my_socket->state() == QAbstractSocket::ConnectedState)  //如果连接正常
+                            {
+                                my_socket->write("reset=done;");
+                                my_socket->flush();
+                            }
+                        }
 
                     }
 
@@ -923,9 +955,18 @@ void Dog_Widget::on_pushButton_Start_clicked()
              }
              else  qDebug()<<"listen error = "<<my_server.errorString();
 
-             socket_countdown_timer.setInterval(ui->lineEdit_countdown_socket->text().toInt()*1000); //读取时间           
-             socket_countdown_timer.start();
-             Log_Add(tr("启动Socket监控"));
+             if (socket_external_only)
+             {
+                 Log_Add(tr("启动Socket外部监控，不计时，仅能通过Socket指令重启目标"));
+             } else {
+                 socket_countdown_timer.setInterval(ui->lineEdit_countdown_socket->text().toInt()*1000); //读取时间
+                 socket_countdown_timer.start();
+                 Log_Add(tr("启动Socket监控"));
+             }
+
+
+
+
         }
 
         if (Ram_Check_Enabled)
@@ -976,6 +1017,7 @@ void Dog_Widget::on_pushButton_Start_clicked()
             Log_Add(tr("停止Socket监控"));
         }
 
+        qDebug()<<"stop working ";
         //ui->label_image->setPixmap(QPixmap::fromImage(QImage("/image/Dog_Sleep.png")).scaled(ui->label_image->size()));
         QIcon icon = QIcon("/image/Dog_Sleep.jpg");      //设置图标等内容
         ui->pushButton_Start->setText(tr("开始监控"));

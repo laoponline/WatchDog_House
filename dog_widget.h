@@ -74,6 +74,8 @@ private:
     int state;
     bool pid_enabled;
     bool socket_enabled;
+    bool socket_external_only = false;
+    bool closing_window = false;
     int reboot_delay = REBOOT_DELAY_DEFAULT;
 
     QString socket_receive_buffer;   //接收到的Socket数据

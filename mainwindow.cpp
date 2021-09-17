@@ -138,8 +138,6 @@ MainWindow::~MainWindow()
     ini_setting.sync();
     qDebug()<<"close size = "<<size()<<" pos = "<<pos();
 
-
-
     delete ui;
 }
 

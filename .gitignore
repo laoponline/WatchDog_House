@@ -64,4 +64,4 @@ compile_commands.json
 
 # QtCreator local machine specific files for imported projects
 *creator.user*
-Dog_House.pro.user
+*.pro.user
