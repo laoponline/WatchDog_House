@@ -178,6 +178,9 @@ void Dog_Widget::reset_target(QString* return_log)
         QString temp =  p->readAllStandardOutput();
         if (temp.contains(target_name))       //寻找目前是否存在目标名称的进程，有的话才结束
           {
+            Socket_Feed();  //喂狗，防止几个看门狗连续到期引发多次重启
+            PID_Feed();
+
             log +=  target_name + tr("已找到，正在结束...");
             p->start(QString("taskkill /im %1 /f").arg(target_name));   //根据目标进程名称关闭程序
             p->waitForFinished();
@@ -986,6 +989,9 @@ void Dog_Widget::on_pushButton_Start_clicked()
 void Dog_Widget::on_pushButton_Mannual_Reboot_clicked()
 {
     QString log = tr("手动重启：");
+//    Socket_Feed();
+//    PID_Feed();
+
     reset_target(&log);
 
     if ((STATE_WORKING == state) && pid_countdown_timer.isActive())   //如果狗正在工作，重置喂狗倒计时器
