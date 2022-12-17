@@ -6,6 +6,10 @@
 ///
 ///
 
+#include <Windows.h>
+#include <Psapi.h>
+#include <TlHelp32.h>
+
 #pragma execution_character_set("utf-8")   //告诉mscv 采用utf-8编码
 #include "dog_widget.h"
 #include "ui_dog_widget.h"
@@ -647,9 +651,9 @@ void Dog_Widget::PID_Timeout()
                     {
                         qDebug()<<line;
                         QStringList line_index = line.split(' ',QString::SkipEmptyParts); //空白部分去除的字符串分割
-                          qDebug()<<"pid = "<<line_index.at(1)<<" Ram = "<<line_index.at(4);
                          ui->lineEdit_target_pid->setText(line_index.at(1));  //显示PID
-
+                         QString exePath = GetPathByProcessID( line_index.at(1).toULong() );  //查找对应的文件地址
+                         qDebug()<<"pid = "<<line_index.at(1)<<" Ram = "<<line_index.at(4)<<" path="<<exePath;
                          QString ram_data = line_index.at(4);
                          ram_data.remove(',');  //去掉数字里的逗号
                          unsigned long long  ram_usage = ram_data.toInt(); //计算Ram使用
@@ -707,6 +711,22 @@ void Dog_Widget::PID_Feed(QString target_name)
 }
 
 
+//通过PID查找到该进程对应的文件地址
+QString Dog_Widget::GetPathByProcessID(DWORD pid)
+{
+    HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+    if (!hProcess)
+    {
+        //QMessageBox::warning(NULL,"GetPathByProcessID","无权访问该进程");
+        return "";
+    }
+    WCHAR filePath[MAX_PATH];
+    DWORD ret= GetModuleFileNameEx(hProcess, NULL, filePath, MAX_PATH) ;
+    QString file = QString::fromStdWString( filePath );
+    //QMessageBox::warning(NULL,"GetPathByProcessID ret=", QString::number(ret)+":"+file);
+    CloseHandle(hProcess);
+    return ret==0?"":file;
+}
 
 
 /************Socket相关******************/
@@ -945,6 +965,7 @@ void Dog_Widget::on_pushButton_Start_clicked()
             if (my_server.isListening())    //先关闭
                 my_server.close();
 
+            my_server.setProxy(QNetworkProxy::NoProxy);
              bool ret = my_server.listen(QHostAddress::AnyIPv4, ui->lineEdit_Dog_port->text().toUShort());
              if (ret )
              {

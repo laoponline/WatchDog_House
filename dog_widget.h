@@ -6,6 +6,7 @@
 #include <QWidget>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QNetworkProxy>
 
 #include <qcustomplot.h>
 #include <globle_define.h>
@@ -118,6 +119,7 @@ private:
 
 
     void Ram_Usage_Check(unsigned long long  ram_usage);
+    QString GetPathByProcessID(DWORD pid);
 };
 
 #endif // DOG_WIDGET_H
